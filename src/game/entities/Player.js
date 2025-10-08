@@ -19,7 +19,7 @@ export class Player {
     this.keys = {};
   }
 
-  update(deltaTime, _upgrades = {}) {
+  update(deltaTime, _upgrades = {}, platforms = []) {
     // Handle sliding
     if (this.isSliding) {
       this.slideTimer -= deltaTime;
@@ -54,7 +54,38 @@ export class Player {
       ? GAME_CONFIG.PLAYER_GROUND_Y + 20
       : GAME_CONFIG.PLAYER_GROUND_Y;
 
-    if (this.y >= groundY) {
+    let onPlatform = false;
+
+    // Check platform collision (land on platforms)
+    if (this.velocityY > 0) { // Only when falling
+      for (const platform of platforms) {
+        if (platform.active) {
+          const playerBottom = this.y + this.height;
+          const playerLeft = this.x;
+          const playerRight = this.x + this.width;
+          const platformTop = platform.y;
+          const platformLeft = platform.x;
+          const platformRight = platform.x + platform.width;
+
+          // Check if player is above platform and landing on it
+          if (
+            playerBottom >= platformTop &&
+            playerBottom <= platformTop + 10 &&
+            playerRight > platformLeft &&
+            playerLeft < platformRight
+          ) {
+            this.y = platformTop - this.height;
+            this.velocityY = 0;
+            this.isJumping = false;
+            onPlatform = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Ground collision (only if not on platform)
+    if (!onPlatform && this.y >= groundY) {
       this.y = groundY;
       this.velocityY = 0;
       this.isJumping = false;

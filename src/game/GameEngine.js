@@ -2,6 +2,7 @@ import { GAME_CONFIG, GAME_STATES, OBSTACLE_TYPES } from './config.js';
 import { Player } from './entities/Player.js';
 import { Obstacle } from './entities/Obstacle.js';
 import { Collectible } from './entities/Collectible.js';
+import { Platform } from './entities/Platform.js';
 import { Background } from './systems/Background.js';
 import { checkCollision, getDistance, randomRange, calculateUpgradeCost } from './utils/helpers.js';
 
@@ -12,10 +13,12 @@ export class GameEngine {
     this.background = new Background();
     this.obstacles = [];
     this.collectibles = [];
+    this.platforms = [];
     this.score = 0;
     this.distance = 0;
     this.gameSpeed = GAME_CONFIG.INITIAL_SPEED;
     this.lastObstacleX = GAME_CONFIG.CANVAS_WIDTH;
+    this.lastPlatformX = GAME_CONFIG.CANVAS_WIDTH;
     this.upgrades = this.initializeUpgrades();
     this.totalPaperclips = 0;
     this.activeBoosts = {
@@ -45,10 +48,12 @@ export class GameEngine {
     this.background.reset();
     this.obstacles = [];
     this.collectibles = [];
+    this.platforms = [];
     this.score = 0;
     this.distance = 0;
     this.gameSpeed = GAME_CONFIG.INITIAL_SPEED;
     this.lastObstacleX = GAME_CONFIG.CANVAS_WIDTH;
+    this.lastPlatformX = GAME_CONFIG.CANVAS_WIDTH;
     this.activeBoosts = {
       coffeeBoost: null,
       rollerChair: null,
@@ -94,7 +99,7 @@ export class GameEngine {
     if (currentMilestone) {
       this.lastMilestone = currentMilestone;
       this.openShop();
-      return;
+      return; // Stop updating while shop is open
     }
 
     // Increase speed over time
@@ -129,13 +134,16 @@ export class GameEngine {
     this.background.update(effectiveSpeed);
 
     // Update player
-    this.player.update(deltaTime, this.upgrades);
+    this.player.update(deltaTime, this.upgrades, this.platforms);
 
     // Spawn obstacles
     this.spawnObstacles();
 
     // Spawn collectibles
     this.spawnCollectibles();
+
+    // Spawn platforms
+    this.spawnPlatforms();
 
     // Update obstacles
     this.obstacles = this.obstacles.filter((obstacle) => {
@@ -147,6 +155,12 @@ export class GameEngine {
     this.collectibles = this.collectibles.filter((collectible) => {
       collectible.update(deltaTime, effectiveSpeed);
       return collectible.active;
+    });
+
+    // Update platforms
+    this.platforms = this.platforms.filter((platform) => {
+      platform.update(deltaTime, effectiveSpeed);
+      return platform.active;
     });
 
     // Check collisions with obstacles
@@ -186,6 +200,26 @@ export class GameEngine {
       this.collectibles.push(
         new Collectible(GAME_CONFIG.CANVAS_WIDTH + 50)
       );
+    }
+  }
+
+  spawnPlatforms() {
+    if (this.lastPlatformX < GAME_CONFIG.CANVAS_WIDTH - 200) {
+      if (Math.random() < 0.3) { // 30% chance to spawn a platform
+        const platformWidth = randomRange(100, 200);
+        const platformY = randomRange(150, 280);
+        const gap = randomRange(150, 400);
+        this.lastPlatformX = GAME_CONFIG.CANVAS_WIDTH + gap;
+        this.platforms.push(new Platform(this.lastPlatformX, platformY, platformWidth));
+      }
+    }
+
+    // Update lastPlatformX based on rightmost platform
+    const rightmostPlatform = this.platforms.reduce((max, plat) => {
+      return plat.x > max ? plat.x : max;
+    }, 0);
+    if (rightmostPlatform > this.lastPlatformX) {
+      this.lastPlatformX = rightmostPlatform;
     }
   }
 
@@ -294,6 +328,9 @@ export class GameEngine {
 
     // Draw background
     this.background.draw(ctx);
+
+    // Draw platforms (behind everything)
+    this.platforms.forEach((platform) => platform.draw(ctx));
 
     // Draw collectibles
     this.collectibles.forEach((collectible) => collectible.draw(ctx));
